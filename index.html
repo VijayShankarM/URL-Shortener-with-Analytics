@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Serverless Link Shortener</title>
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(to right, #e8f5e9, #c8e6c9); /* Softer light green gradient */
+            color: #333; /* Updated text color for better contrast */
+        }
+        input, button {
+            margin: 10px;
+            padding: 10px;
+            width: 80%;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            border: 2px solid #a5d6a7; /* Light green border for input and button */
+        }
+        input {
+            background-color: #ffffff;
+            color: #333;
+        }
+        button {
+            background-color: #4eb853; /* Softer green button background */
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+        }
+        button:hover {
+            background-color: #57a05a; /* Updated hover effect */
+            transform: scale(1.05);
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        #short-url, #analytics {
+            margin-top: 20px;
+            background-color: rgba(0, 0, 0, 0.9); /* Increased transparency for a lighter feel */
+            padding: 1px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 2px solid #a5d6a7; /* Light green border for sections */
+        }
+        table {
+            width: 80%;
+            margin: auto;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background-color: #ffffff;
+            color: #333;
+            border-radius: 5px;
+            overflow: hidden;
+            border: 2px solid #a5d6a7; /* Light green border for the table */
+        }
+        th, td {
+            border: 1px solid #a5d6a7; /* Light green border for table cells */
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #66bb6a; /* Softer green table header */
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        tr:hover {
+            background-color: #f1f1f1;
+        }
+        h2 {
+            margin-bottom: 20px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1); /* Softer text shadow */
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Shorten Your URL</h2>
+    <div style="display: flex; justify-content: center; align-items: center;">
+        <input type="text" id="longUrl" placeholder="Enter long URL" required style="flex: 4; padding: 10px;">
+        <button onclick="pasteFromClipboard()" style="margin-left: 10px; flex: 1; padding: 10px;">Paste</button>
+    </div>
+    <button onclick="generateShortURL()">Generate Short Link</button>
+    <div id="short-url" style="margin-top: 20px;"></div>
+
+    <h2>Track Clicks</h2>
+    <div style="display: flex; justify-content: center; align-items: center;">
+        <input type="text" id="shortCode" placeholder="Enter Short Code (e.g., abc123)" required style="flex: 4; padding: 10px;">
+        <button onclick="pasteFromClipboardToAnalytics()" style="margin-left: 10px; flex: 1; padding: 10px;">Paste</button>
+    </div>
+    <button onclick="getAnalytics()">Get Analytics</button>
+    <div id="analytics"></div>
+
+    <script>
+        const API_BASE_URL = "https://pilvnjuvog.execute-api.us-east-1.amazonaws.com/prod";
+
+        function displayMessage(message, type) {
+            const messageDiv = document.createElement("div");
+            messageDiv.textContent = message;
+            messageDiv.style.marginTop = "10px";
+            messageDiv.style.color = type === "success" ? "green" : "red";
+            document.body.appendChild(messageDiv);
+            setTimeout(() => messageDiv.remove(), 3000);
+        }
+
+        async function generateShortURL() {
+            const longUrl = document.getElementById("longUrl").value.trim();
+            if (!longUrl) {
+                displayMessage("Please enter a valid URL!", "error");
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE_URL}/generate`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ longURL: longUrl })
+                });
+                if (!response.ok) throw new Error("Failed to generate short URL");
+                const result = await response.json();
+                const shortUrl = `${API_BASE_URL}/${result.shortCode}`;
+                document.getElementById("short-url").innerHTML = `
+                    <div style="display: flex; justify-content: center; align-items: center;">
+                        <p style="flex: 4;">Shortened URL: <a href="${shortUrl}" target="_blank">${shortUrl}</a></p>
+                        <button style="margin-left: 10px; flex: 1; padding: 10px;" onclick="copyToClipboard('${shortUrl}')">Copy</button>
+                    </div>
+                `;
+                displayMessage("Short URL generated successfully!", "success");
+            } catch (error) {
+                displayMessage("Error generating short URL: " + error.message, "error");
+            }
+        }
+
+        async function getAnalytics() {
+            let shortCode = document.getElementById("shortCode").value.trim();
+            if (!shortCode) {
+                displayMessage("Please enter a short code!", "error");
+                return;
+            }
+
+            // Extract only the short code if a full URL is pasted
+            if (shortCode.includes("/")) {
+                shortCode = shortCode.split("/").pop();
+            }
+
+            const url = `${API_BASE_URL}/analytics?shortCode=${shortCode}`;
+            try {
+                const response = await fetch(url, {
+                    method: "GET",
+                    headers: { "Content-Type": "application/json" }
+                });
+                if (!response.ok) throw new Error("Failed to fetch analytics");
+                const data = await response.json();
+
+                let analyticsDiv = document.getElementById("analytics");
+                analyticsDiv.innerHTML = `<h3>Total Clicks: ${data.totalClicks || 0}</h3>`;
+                if (data.clickDetails && data.clickDetails.length > 0) {
+                    let tableHTML = `<table><tr><th>Timestamp (IST)</th><th>IP Address</th><th>User Agent</th></tr>`;
+                    data.clickDetails.forEach(click => {
+                        tableHTML += `<tr><td>${click.timestamp || "N/A"}</td><td>${click.ipAddress || "N/A"}</td><td>${click.userAgent || "N/A"}</td></tr>`;
+                    });
+                    tableHTML += `</table>`;
+                    analyticsDiv.innerHTML += tableHTML;
+                } else {
+                    analyticsDiv.innerHTML += "<p>No clicks recorded yet.</p>";
+                }
+                displayMessage("Analytics fetched successfully!", "success");
+            } catch (error) {
+                displayMessage("Error fetching analytics: " + error.message, "error");
+            }
+        }
+
+        function copyToClipboard(text) {
+            if (!navigator.clipboard) {
+                displayMessage("Clipboard API not supported in this browser.", "error");
+                return;
+            }
+            navigator.clipboard.writeText(text).then(() => {
+                displayMessage("Short URL copied to clipboard!", "success");
+            }).catch(err => {
+                console.error("Error copying to clipboard:", err);
+                displayMessage("Failed to copy the URL.", "error");
+            });
+        }
+
+        function pasteFromClipboard() {
+            if (!navigator.clipboard) {
+                displayMessage("Clipboard API not supported in this browser.", "error");
+                return;
+            }
+            navigator.clipboard.readText().then(text => {
+                if (text) {
+                    document.getElementById("longUrl").value = text;
+                    displayMessage("Pasted from clipboard!", "success");
+                } else {
+                    displayMessage("Clipboard is empty.", "error");
+                }
+            }).catch(err => {
+                console.error("Error pasting from clipboard:", err);
+                displayMessage("Failed to paste the URL.", "error");
+            });
+        }
+
+        function pasteFromClipboardToAnalytics() {
+            if (!navigator.clipboard) {
+                displayMessage("Clipboard API not supported in this browser.", "error");
+                return;
+            }
+            navigator.clipboard.readText().then(text => {
+                if (text) {
+                    document.getElementById("shortCode").value = text;
+                    displayMessage("Pasted from clipboard!", "success");
+                } else {
+                    displayMessage("Clipboard is empty.", "error");
+                }
+            }).catch(err => {
+                console.error("Error pasting from clipboard:", err);
+                displayMessage("Failed to paste the URL.", "error");
+            });
+        }
+    </script>
+</body>
+</html>
