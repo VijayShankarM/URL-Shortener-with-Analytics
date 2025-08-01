@@ -3,11 +3,12 @@ import boto3
 import hashlib
 import time
 
+# Change to your actual DynamoDB table name
 dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('ShortenedURLs')
+table = dynamodb.Table('URLShortenerTable')  # ✅ Renamed from 'ShortenedURLs' to 'URLShortenerTable'
 
-# Replace this with your actual domain (CloudFront or API Gateway)
-BASE_URL = "https://pilvnjuvog.execute-api.us-east-1.amazonaws.com/prod"
+# Replace with your actual API Gateway or CloudFront URL
+BASE_URL = "https://your-api-id.execute-api.region.amazonaws.com/prod"  # ✅ Update this to your actual base URL
 
 def lambda_handler(event, context):
     try:
@@ -32,13 +33,13 @@ def lambda_handler(event, context):
             'statusCode': 200,
             'headers': {
                 "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",  # Allow all origins
+                "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type"
             },
             'body': json.dumps({
                 'shortCode': short_code,
-                'shortURL': f"{BASE_URL}/{short_code}"  # Use actual API Gateway URL
+                'shortURL': f"{BASE_URL}/{short_code}"
             })
         }
 
