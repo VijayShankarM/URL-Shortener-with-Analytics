@@ -4,8 +4,8 @@ from datetime import datetime, timedelta
 
 # Initialize DynamoDB
 dynamodb = boto3.resource('dynamodb')
-urls_table = dynamodb.Table('ShortenedURLs')
-analytics_table = dynamodb.Table('ClickAnalytics')
+url_table = dynamodb.Table('URLShortenerTable')
+clicks_table = dynamodb.Table('URLClickAnalyticsTable')
 
 def is_browser(user_agent):
     """ Check if the request is coming from a real web browser. """
@@ -32,7 +32,7 @@ def lambda_handler(event, context):
             return cors_response(400, {'error': 'Short code is required'})
 
         # Fetch URL details
-        response = urls_table.get_item(Key={'shortCode': short_code})
+        response = url_table.get_item(Key={'shortCode': short_code})
         if 'Item' not in response:
             return cors_response(404, {'error': 'URL not found'})
 
@@ -42,7 +42,6 @@ def lambda_handler(event, context):
         ip_address = get_ip_address(event)
         user_agent = event.get('headers', {}).get('User-Agent', 'Unknown')
 
-        # Debugging: Log extracted User-Agent
         print(f"Extracted User-Agent: {user_agent}")
 
         # Block if request is not from a real browser
@@ -54,7 +53,7 @@ def lambda_handler(event, context):
         timestamp_ist = get_ist_timestamp()
 
         # Log only real browser clicks
-        analytics_table.put_item(
+        clicks_table.put_item(
             Item={
                 'shortCode': short_code,
                 'timestamp': timestamp_ist,
